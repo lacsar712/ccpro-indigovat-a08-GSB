@@ -88,6 +88,25 @@
       color: var(--foam);
       font-size: 0.9rem;
     }
+    .topnav {
+      display: flex;
+      gap: 0.5rem;
+      margin: 0 0 1.15rem;
+    }
+    .topnav a {
+      padding: 0.4rem 1rem;
+      border-radius: 999px;
+      border: 1px solid rgba(216, 235, 232, 0.35);
+      color: var(--foam);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .topnav a:hover { border-color: rgba(216, 235, 232, 0.7); }
+    .topnav a.on {
+      background: linear-gradient(135deg, rgba(61, 139, 156, 0.85), rgba(31, 77, 107, 0.95));
+      border-color: rgba(216, 235, 232, 0.65);
+    }
     .user-pill button {
       width: auto;
       margin: 0;
@@ -186,6 +205,12 @@
       margin-top: 0.35rem;
     }
     .vat-card .mv.empty { opacity: 0.55; font-size: 0.82rem; }
+    .vat-card .ferment-cnt {
+      margin-top: 0.2rem;
+      font-size: 0.72rem;
+      opacity: 0.78;
+      letter-spacing: 0.02em;
+    }
     .status-dot {
       display: inline-block;
       width: 0.55rem;
@@ -298,6 +323,10 @@
         </form>
       </div>
     </header>
+    <nav class="topnav" aria-label="主导航">
+      <a href="/" class="{% if active == 'bay' %}on{% endif %}">染缸还原台</a>
+      <a href="/ferment" class="{% if active == 'ferment' %}on{% endif %}">发酵温志</a>
+    </nav>
     {% endif %}
     {% block content %}{% endblock %}
   </div>

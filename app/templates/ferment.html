@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}发酵温志{% endblock %}
+{% block content %}
+<div class="chips" role="toolbar" aria-label="选择染缸">
+  {% for v in vats %}
+  <a
+    class="chip {% if selected and v.id == selected.id %}on{% endif %}"
+    style="text-decoration:none;display:inline-flex;align-items:center;gap:0.45rem"
+    href="/ferment?vat={{ v.id }}"
+  >
+    <span style="border-radius:50%;display:inline-block;width:0.55rem;height:0.55rem;background:{% if v.status == 'ready' %}#5dcea8{% elif v.status == 'reducing' %}#7eb8d8{% else %}var(--idle){% endif %}"></span>
+    <span>{{ v.code }}</span>
+    <span style="opacity:0.75">志 {{ v.fermentCount }} 条</span>
+  </a>
+  {% endfor %}
+</div>
+
+{% if error %}
+<div class="error-box">{{ error }}</div>
+{% endif %}
+
+{% if not selected %}
+<div class="panel">
+  <h2>靛蓝发酵温志</h2>
+  <p class="hint">上方选择染缸查看与登记温志。仅<strong>还原中</strong>的染缸可登记新温志；缸位条上的「志 N 条」与本页对账。</p>
+</div>
+{% else %}
+<div class="panel">
+  <h2>
+    {{ selected.code }}
+    <span style="font-weight:500;font-size:0.9rem;color:#4a6670;margin-left:0.4rem">
+      {{ selected.workshopName }} · {{ selected.dyeType }} · 当前 {{ selected.statusLabel }}
+    </span>
+  </h2>
+  <p class="hint">
+    已登记 <strong>{{ logs|length }}</strong> 条温志。
+    改可染色须最近四条温志齐套，并同时满足最新浸染电位 ≤ -500 mV（判定同在还原台改状态处）。
+  </p>
+
+  <h3 style="font-size:1rem;margin:0.3rem 0 0.65rem;color:#1f4d6b">温志明细（按采样时刻）</h3>
+  {% if logs %}
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:0.9rem;background:#fff">
+      <thead>
+        <tr style="text-align:left;color:#1f4d6b;border-bottom:2px solid #b7cdd0">
+          <th style="padding:0.5rem">志序号</th>
+          <th style="padding:0.5rem">液温 (℃)</th>
+          <th style="padding:0.5rem">酸碱值</th>
+          <th style="padding:0.5rem">采样时刻</th>
+          <th style="padding:0.5rem">巡检人</th>
+          <th style="padding:0.5rem"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in logs %}
+        <tr style="border-bottom:1px dashed #c5d8d6">
+          <td style="padding:0.5rem">{{ l.seq }}</td>
+          <td style="padding:0.5rem">{{ '%.2f'|format(l.tempC) }}</td>
+          <td style="padding:0.5rem">{{ '%.2f'|format(l.ph) }}</td>
+          <td style="padding:0.5rem">{{ l.sampledAt }}</td>
+          <td style="padding:0.5rem">{{ l.inspector }}</td>
+          <td style="padding:0.5rem">
+            <a href="/ferment?vat={{ selected.id }}&edit={{ l.id }}">编辑</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:#6b7c85;font-size:0.9rem">本缸尚无温志。</p>
+  {% endif %}
+
+  <div class="panel-grid" style="margin-top:1.1rem">
+    {% if edit_log %}
+    <div>
+      <h3 style="font-size:1rem;margin:0 0 0.65rem;color:#1f4d6b">更新温志 #{{ edit_log.seq }}</h3>
+      <form method="post" action="/ferment/logs/{{ edit_log.id }}">
+        <label>志序号（同缸唯一）
+          <input type="number" name="seq" min="1" step="1" required value="{{ form.seq if form.seq is defined else edit_log.seq }}">
+        </label>
+        <label>液温 (℃，20~42)
+          <input type="number" name="tempC" step="0.01" min="20" max="42" required value="{{ form.tempC if form.tempC is defined else ('%.2f'|format(edit_log.tempC)) }}">
+        </label>
+        <label>酸碱值 (8~12)
+          <input type="number" name="ph" step="0.01" min="8" max="12" required value="{{ form.ph if form.ph is defined else ('%.2f'|format(edit_log.ph)) }}">
+        </label>
+        <label>采样时刻
+          <input type="datetime-local" name="sampledAt" required value="{{ form.sampledAt if form.sampledAt is defined else edit_log.sampledAtLocal }}">
+        </label>
+        <label>巡检人
+          <input type="text" name="inspector" maxlength="80" required value="{{ form.inspector if form.inspector is defined else edit_log.inspector }}">
+        </label>
+        <button type="submit">保存更新</button>
+        <a href="/ferment?vat={{ selected.id }}" style="margin-left:0.75rem;font-size:0.88rem">取消</a>
+      </form>
+    </div>
+    {% elif selected.status == 'reducing' %}
+    <div>
+      <h3 style="font-size:1rem;margin:0 0 0.65rem;color:#1f4d6b">登记发酵温志</h3>
+      <form method="post" action="/ferment/vats/{{ selected.id }}/logs">
+        <label>志序号（同缸唯一）
+          <input type="number" name="seq" min="1" step="1" required value="{{ form.seq if form.seq is defined else '' }}" placeholder="例如 5">
+        </label>
+        <label>液温 (℃，20~42)
+          <input type="number" name="tempC" step="0.01" min="20" max="42" required value="{{ form.tempC if form.tempC is defined else '' }}" placeholder="例如 31.5">
+        </label>
+        <label>酸碱值 (8~12)
+          <input type="number" name="ph" step="0.01" min="8" max="12" required value="{{ form.ph if form.ph is defined else '' }}" placeholder="例如 9.4">
+        </label>
+        <label>采样时刻
+          <input type="datetime-local" name="sampledAt" required value="{{ form.sampledAt if form.sampledAt is defined else '' }}" id="sampledAtInput">
+        </label>
+        <label>巡检人
+          <input type="text" name="inspector" maxlength="80" required value="{{ form.inspector if form.inspector is defined else '' }}" placeholder="巡检人姓名">
+        </label>
+        <button type="submit">写入本缸</button>
+      </form>
+    </div>
+    {% else %}
+    <div>
+      <h3 style="font-size:1rem;margin:0 0 0.65rem;color:#1f4d6b">登记发酵温志</h3>
+      <p style="color:#8b1e1e;font-size:0.9rem">仅<strong>还原中</strong>的染缸可登记温志；当前为「{{ selected.statusLabel }}」。可在还原台先改回还原中。</p>
+    </div>
+    {% endif %}
+
+    <div>
+      <h3 style="font-size:1rem;margin:0 0 0.65rem;color:#1f4d6b">改可染色的齐套口径</h3>
+      <ul class="lot-list" style="font-size:0.88rem">
+        <li>至少 <strong>4 条</strong>连续温志（少一条不放行）</li>
+        <li>相邻两条<strong>液温差 ≤ 3 ℃</strong></li>
+        <li>四条<strong>酸碱值平均 ≥ 9</strong></li>
+        <li>最新采样时刻<strong>晚于最近一次浸染</strong></li>
+        <li>同时最新浸染批次<strong>电位 ≤ -500 mV</strong>（原门槛不拆）</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<p class="rule-foot">
+  读数范围：液温 20~42 ℃、酸碱值 8~12；同缸志序号唯一，并发重复序号仅一笔落库。
+</p>
+{% endif %}
+
+<script>
+  (function () {
+    var input = document.getElementById('sampledAtInput');
+    if (input && !input.value) {
+      var d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      input.value = d.toISOString().slice(0, 16);
+    }
+  })();
+</script>
+{% endblock %}

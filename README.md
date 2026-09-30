@@ -35,11 +35,25 @@ docker compose up --build -d
 
 ## 交互（信息架构）
 
-1. **染缸还原台**：横滑缸位条，每缸显示状态、最近电位与 redox sparkline
-2. **工坊 chip**：仅作缸位筛选，无独立工坊 CRUD 页
-3. **点缸展开**：同页内登记浸染批次、改状态、看近几笔；无平行「染缸表 / 批次表」
+1. **染缸还原台**：横滑缸位条，每缸显示状态、最近电位、redox sparkline 与发酵温志条数；点缸展开记浸染、改状态
+2. **发酵温志**（顶栏专页 `/ferment`）：按缸登记/更新靛蓝发酵温志，条数与还原台缸位条对账
+3. **工坊 chip**：仅作缸位筛选，无独立工坊 CRUD 页
 
-**业务规则**：状态改为 `ready`（可染色）时，最新批次 `redoxMv` 须已填且 ≤ -500（见 `vat_rules.py`）。
+**业务规则**（判定集中在 `app/services/vat_rules.py` 的 `validate_vat_status_change`）：状态改为 `ready`（可染色）时，**两类门槛挂在同一改状态函数里、缺一不可**：
+
+- 浸染电位门槛（原有，不拆）：最新批次 `redoxMv` 须已填且 ≤ -500；
+- 发酵温志齐套：最近 **4 条**连续温志，相邻液温差 **≤ 3 ℃**，四条**酸碱值平均 ≥ 9**，且最新采样时刻**晚于最近一次浸染**。
+
+任一不满足都不改状态（无半改）。
+
+### 发酵温志
+
+字段：染缸、志序号、液温摄氏、酸碱值、采样时刻、巡检人。
+
+- 同缸志序号唯一（数据库唯一约束兜底，并发写入同序号只许一笔落库，另一笔中文报错，回滚后专页与还原台仍可继续操作）；
+- 液温 20~42 ℃、酸碱值 8~12，新建与更新共用同一读数校验；
+- 仅**还原中**的染缸可登记温志；
+- 种子：V-01 四条齐套，V-03 只有 3 条（少一条不放行）。
 
 ## 本地开发（可选）
 
@@ -57,6 +71,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 4720 --reload
 1. **Workshop**：`name`、`region`、`notes`（UI 上仅为筛选片）
 2. **Vat**：归属工坊、`code`、`dyeType`、`volumeL`、状态 `idle|reducing|ready`
 3. **DipLot**：归属染缸、`dippedAt`、`clothMeters`、`redoxMv`（可空）
+4. **FermentLog**：归属染缸、同缸唯一 `seq`、`tempC`、`ph`、`sampledAt`、`inspector`
 
 ## 目录结构
 
@@ -73,7 +88,7 @@ IndigoVat-01/
     schemas.py
     auth.py
     seed.py
-    routers/
+    routers/           # auth / pages（还原台）/ ferment（温志专页）
     services/vat_rules.py
-    templates/   # base / bay / login
+    templates/         # base / bay / login / ferment
 ```

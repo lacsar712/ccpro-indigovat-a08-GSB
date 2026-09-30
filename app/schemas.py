@@ -26,6 +26,15 @@ class DipLotIn(BaseModel):
     redoxMv: Optional[Decimal] = None
 
 
+class FermentLogIn(BaseModel):
+    vat_id: int
+    seq: int = Field(gt=0)
+    tempC: Decimal = Field(ge=Decimal("20"), le=Decimal("42"))
+    ph: Decimal = Field(ge=Decimal("8"), le=Decimal("12"))
+    sampledAt: datetime
+    inspector: str = Field(min_length=1, max_length=80)
+
+
 class MessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     detail: str

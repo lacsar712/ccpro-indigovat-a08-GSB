@@ -55,11 +55,17 @@ class Vat(Base):
 
     workshop: Mapped["Workshop"] = relationship(back_populates="vats")
     lots: Mapped[list["DipLot"]] = relationship(back_populates="vat")
+    ferment_logs: Mapped[list["FermentLog"]] = relationship(
+        back_populates="vat", cascade="all, delete-orphan"
+    )
 
     def latest_lot(self) -> Optional["DipLot"]:
         if not self.lots:
             return None
         return sorted(self.lots, key=lambda x: (x.dippedAt, x.id), reverse=True)[0]
+
+    def ordered_ferment_logs(self) -> list["FermentLog"]:
+        return sorted(self.ferment_logs, key=lambda x: (x.sampledAt, x.id))
 
 
 class DipLot(Base):
@@ -72,3 +78,22 @@ class DipLot(Base):
     redoxMv: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 2), nullable=True)
 
     vat: Mapped["Vat"] = relationship(back_populates="lots")
+
+
+class FermentLog(Base):
+    """靛蓝还原发酵温志：还原中按缸登记的液温/酸碱采样。"""
+
+    __tablename__ = "ferment_logs"
+    __table_args__ = (
+        UniqueConstraint("vat_id", "seq", name="uniq_ferment_seq_per_vat"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vat_id: Mapped[int] = mapped_column(ForeignKey("vats.id", ondelete="CASCADE"))
+    seq: Mapped[int] = mapped_column()
+    tempC: Mapped[Decimal] = mapped_column(Numeric(5, 2))
+    ph: Mapped[Decimal] = mapped_column(Numeric(4, 2))
+    sampledAt: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    inspector: Mapped[str] = mapped_column(String(80))
+
+    vat: Mapped["Vat"] = relationship(back_populates="ferment_logs")

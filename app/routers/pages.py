@@ -70,6 +70,7 @@ def _vat_payload(vat: Vat) -> dict:
         "statusLabel": STATUS_LABELS.get(vat.status, vat.status),
         "workshopId": vat.workshop_id,
         "workshopName": vat.workshop.name if vat.workshop else "",
+        "fermentCount": len(vat.ferment_logs),
         "lastRedox": float(latest.redoxMv) if latest and latest.redoxMv is not None else None,
         "lastMeters": float(latest.clothMeters) if latest else None,
         "lastDippedAt": latest.dippedAt.strftime("%Y-%m-%d %H:%M") if latest else None,
@@ -98,7 +99,11 @@ def _bay_context(
     workshops = db.query(Workshop).order_by(Workshop.name).all()
     vats = (
         db.query(Vat)
-        .options(joinedload(Vat.workshop), joinedload(Vat.lots))
+        .options(
+            joinedload(Vat.workshop),
+            joinedload(Vat.lots),
+            joinedload(Vat.ferment_logs),
+        )
         .order_by(Vat.code)
         .all()
     )
@@ -141,7 +146,11 @@ async def bay_vat_status(
         return RedirectResponse("/login", status_code=303)
     item = (
         db.query(Vat)
-        .options(joinedload(Vat.workshop), joinedload(Vat.lots))
+        .options(
+            joinedload(Vat.workshop),
+            joinedload(Vat.lots),
+            joinedload(Vat.ferment_logs),
+        )
         .filter(Vat.id == pk)
         .first()
     )
@@ -151,7 +160,9 @@ async def bay_vat_status(
     error = None
     try:
         latest = item.latest_lot()
-        validate_vat_status_change(item, status, latest)
+        # 温志齐套与既有电位门槛同在 validate_vat_status_change 内判定，
+        # 任一不过即抛错，状态不落库（无半改）。
+        validate_vat_status_change(item, status, latest, item.ferment_logs)
         item.status = status
         db.commit()
         return RedirectResponse(f"/?vat={pk}" + (f"&workshop={ws}" if ws else ""), status_code=303)

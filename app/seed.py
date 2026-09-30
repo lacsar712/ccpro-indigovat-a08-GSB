@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.models import DipLot, User, Vat, Workshop
+from app.models import DipLot, FermentLog, User, Vat, Workshop
 
 _PWD_SALT = os.environ.get("PWD_SALT", "indigovat-dev-salt").encode("utf-8")
 
@@ -97,6 +97,22 @@ def ensure_seed_data(db: Session) -> None:
             )
         return rows
 
+    def ferment(vat_id: int, series):
+        """series: (hours_ago, seq, temp_c, ph, inspector)。"""
+        rows = []
+        for hours, seq, temp, ph, inspector in series:
+            rows.append(
+                FermentLog(
+                    vat_id=vat_id,
+                    seq=seq,
+                    tempC=Decimal(temp),
+                    ph=Decimal(ph),
+                    sampledAt=now - timedelta(hours=hours),
+                    inspector=inspector,
+                )
+            )
+        return rows
+
     db.add_all(
         lots(
             v1.id,
@@ -137,6 +153,43 @@ def ensure_seed_data(db: Session) -> None:
                 (32, "28.00", "-470.00"),
                 (20, "33.00", "-505.00"),
                 (10, "38.50", "-530.00"),
+            ],
+        )
+    )
+
+    # V-01（还原中）：四条齐套温志——相邻温差 ≤3 ℃、pH 均值 9.3 ≥9，
+    # 且最新采样晚于最近浸染（最近浸染 8 小时前，最新采样 1 小时前）。
+    db.add_all(
+        ferment(
+            v1.id,
+            [
+                (6, 1, "30.00", "9.00", "阿靛"),
+                (5, 2, "31.50", "9.20", "阿靛"),
+                (3, 3, "30.50", "9.40", "青禾"),
+                (1, 4, "32.00", "9.60", "青禾"),
+            ],
+        )
+    )
+    # V-03（还原中）：只有 3 条温志，差一条，不可改可染色。
+    db.add_all(
+        ferment(
+            v3.id,
+            [
+                (9, 1, "33.00", "9.10", "阿岚"),
+                (7, 2, "34.00", "9.20", "阿岚"),
+                (4, 3, "33.50", "9.30", "阿岚"),
+            ],
+        )
+    )
+    # V-04（可染色）：最近一次浸染 10 小时前，四条温志均在其后，保持状态自洽。
+    db.add_all(
+        ferment(
+            v4.id,
+            [
+                (9, 1, "29.00", "9.20", "青禾"),
+                (7, 2, "30.50", "9.30", "青禾"),
+                (5, 3, "31.00", "9.40", "阿靛"),
+                (3, 4, "30.00", "9.50", "阿靛"),
             ],
         )
     )
