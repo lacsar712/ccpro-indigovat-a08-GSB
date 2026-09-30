@@ -63,6 +63,13 @@
             <span>尚无电位</span>
           </template>
         </div>
+        <div class="ferment-pill">
+          <span class="ferment-link" role="link" tabindex="0"
+                @click.stop="location.href = '/ferment?vat=' + v.id"
+                @keydown.enter.stop.prevent="location.href = '/ferment?vat=' + v.id">发酵温志</span>
+          <span :class="{ short: v.fermentCount < 4 }"
+                x-text="'志 ' + v.fermentCount + ' 条'"></span>
+        </div>
       </button>
     </template>
   </div>
@@ -78,7 +85,8 @@
         </h2>
         <p class="hint">当前 <strong x-text="selected().statusLabel"></strong>
           · 最近浸染 <span x-text="selected().lastDippedAt || '—'"></span>
-          · 设为可染色须最新批次电位 ≤ -500 mV</p>
+          · 发酵温志 <strong x-text="selected().fermentCount + ' 条'"></strong>
+          · 设为可染色须最新批次电位 ≤ -500 mV 且温志齐套（≥4 条、温差 ≤3℃、酸碱均值 ≥9、最新采集晚于最近浸染）</p>
 
         <div class="panel-grid">
           <div>
@@ -130,7 +138,7 @@
     </template>
   </div>
 
-  <p class="rule-foot">工坊只作缸位筛选片；浸染与状态均在缸位展开区内完成，无独立表页。</p>
+  <p class="rule-foot">浸染与状态在缸位展开区内完成；发酵温志登记见顶栏「发酵温志」专页，条数与缸位条对账。</p>
 </div>
 
 <script>

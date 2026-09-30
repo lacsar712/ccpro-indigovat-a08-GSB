@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}发酵温志{% endblock %}
+{% block content %}
+<div x-data="fermentPage()" x-init="init()">
+  {% if error %}
+  <div class="error-box">{{ error }}</div>
+  {% endif %}
+
+  <div class="panel" style="margin-bottom:1rem;padding:0.9rem 1.15rem">
+    <strong style="color:var(--indigo-deep)">齐套口径（改可染色时与电位门槛同查）</strong>
+    <ul style="margin:0.5rem 0 0;padding-left:1.15rem;font-size:0.88rem;color:#35505a">
+      <li>至少 <strong>4 条连续志</strong>；相邻志<strong>液温相差不超过 3℃</strong>（取最近四条逐对温差）。</li>
+      <li>最近四条<strong>酸碱值平均不低于 9</strong>。</li>
+      <li>最新一条<strong>采样时刻晚于最近一次浸染</strong>。</li>
+      <li>同时最新浸染批次氧化还原电位须 ≤ -500 mV（原门槛照旧）。</li>
+    </ul>
+  </div>
+
+  <div class="chips" role="toolbar" aria-label="染缸选择">
+    <template x-for="v in vats" :key="v.id">
+      <button
+        type="button"
+        class="chip"
+        :class="{ on: selectedId === v.id }"
+        @click="select(v.id)"
+      >
+        <span x-text="v.code"></span>
+        <span style="opacity:0.75" x-text="' · 志' + v.logCount + '条 · ' + v.statusLabel"></span>
+      </button>
+    </template>
+  </div>
+
+  <div class="panel" x-show="selected()" x-cloak x-transition>
+    <template x-if="selected()">
+      <div>
+        <h2>
+          <span x-text="selected().code"></span>
+          <span style="font-weight:500;font-size:0.9rem;color:#4a6670;margin-left:0.4rem"
+                x-text="selected().workshopName + ' · ' + selected().dyeType + ' · ' + selected().statusLabel"></span>
+        </h2>
+        <p class="hint">
+          本缸温志 <strong x-text="selected().logCount + ' 条'"></strong>
+          · 最近四条最大相邻温差
+          <strong x-text="selected().last4MaxGap === null ? '—' : (selected().last4MaxGap + ' ℃')"></strong>
+          · 最近四条酸碱均值
+          <strong x-text="selected().last4PhAvg === null ? '—' : selected().last4PhAvg"></strong>
+          · 最新采集 <span x-text="selected().lastSampledAt || '—'"></span>
+        </p>
+
+        <div x-show="selected().status !== 'reducing'" class="error-box" style="background:#f3efe2;border-color:#ddd0a8;color:#7a6420">
+          仅「还原中」的染缸可登记或修改温志；本缸当前状态为 <span x-text="selected().statusLabel"></span>。
+        </div>
+
+        <div class="panel-grid">
+          <div x-show="selected().status === 'reducing'">
+            <h3 style="font-size:1rem;margin:0 0 0.65rem;color:#1f4d6b">登记温志</h3>
+            <form method="post" :action="'/ferment/vats/' + selected().id + '/logs'">
+              <label>志序号（同缸唯一）
+                <input type="number" name="seq" min="1" step="1" required placeholder="例如 1">
+              </label>
+              <label>液温摄氏（20–42）
+                <input type="number" name="tempC" min="20" max="42" step="0.1" required placeholder="例如 31.5">
+              </label>
+              <label>酸碱值（8–12）
+                <input type="number" name="ph" min="8" max="12" step="0.1" required placeholder="例如 9.6">
+              </label>
+              <label>采样时刻
+                <input type="datetime-local" name="sampledAt" required :value="nowLocal()">
+              </label>
+              <label>巡检人
+                <input type="text" name="inspector" maxlength="80" required placeholder="巡检人姓名"
+                       :value="'{{ user.username }}'">
+              </label>
+              <button type="submit">登记本志</button>
+            </form>
+          </div>
+
+          <div>
+            <h3 style="font-size:1rem;margin:0 0 0.65rem;color:#1f4d6b">温志明细</h3>
+            <table class="log-table">
+              <thead>
+                <tr>
+                  <th>序号</th><th>液温℃</th><th>酸碱值</th><th>采样时刻</th><th>巡检人</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="l in selected().logs" :key="l.id">
+                  <tr>
+                    <template x-if="editingId !== l.id">
+                      <td colspan="6">
+                        <div class="log-view">
+                        <span x-text="l.seq"></span>
+                        <span x-text="l.tempC"></span>
+                        <span x-text="l.ph"></span>
+                        <span x-text="l.sampledAt"></span>
+                        <span x-text="l.inspector"></span>
+                        <button type="button" class="link-btn"
+                                x-show="selected().status === 'reducing'"
+                                @click="editingId = l.id">改记</button>
+                        </div>
+                      </td>
+                    </template>
+                    <template x-if="editingId === l.id">
+                      <td colspan="6">
+                        <form method="post" :action="'/ferment/logs/' + l.id + '/edit'" class="edit-form">
+                          <input type="number" name="seq" min="1" step="1" required :value="l.seq">
+                          <input type="number" name="tempC" min="20" max="42" step="0.1" required :value="l.tempC">
+                          <input type="number" name="ph" min="8" max="12" step="0.1" required :value="l.ph">
+                          <input type="datetime-local" name="sampledAt" required :value="l.sampledAtRaw">
+                          <input type="text" name="inspector" maxlength="80" required :value="l.inspector">
+                          <span class="edit-actions">
+                            <button type="submit">保存</button>
+                            <button type="button" class="link-btn" @click="editingId = null">取消</button>
+                          </span>
+                        </form>
+                      </td>
+                    </template>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <p x-show="!selected().logs.length" style="color:#6b7c85;font-size:0.88rem">尚无温志。</p>
+            <p class="hint" style="margin-top:0.75rem">
+              条数与还原台缸位条一致；不足 4 条时改可染色会被拦下。
+            </p>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+  <div class="empty-bay" x-show="!selected()" x-cloak>请选择上方染缸查看温志。</div>
+
+  <p class="rule-foot">仅还原中可登记；同缸志序号唯一，并发重复序号只落一笔并中文提示。</p>
+</div>
+
+<script>
+  function fermentPage() {
+    return {
+      vats: {{ vats | tojson }},
+      selectedId: {{ selected_vat if selected_vat is not none else 'null' }},
+      editingId: null,
+      init() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('vat') && this.selectedId === null) {
+          const v = parseInt(params.get('vat'), 10);
+          if (!isNaN(v)) this.selectedId = v;
+        }
+      },
+      select(id) {
+        this.editingId = null;
+        this.selectedId = id;
+        const url = new URL(window.location.href);
+        url.searchParams.set('vat', id);
+        history.replaceState(null, '', url.pathname + url.search);
+      },
+      selected() {
+        return this.vats.find(v => v.id === this.selectedId) || null;
+      },
+      nowLocal() {
+        const d = new Date();
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        return d.toISOString().slice(0, 16);
+      },
+    };
+  }
+</script>
+{% endblock %}

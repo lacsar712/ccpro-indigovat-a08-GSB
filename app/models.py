@@ -55,6 +55,7 @@ class Vat(Base):
 
     workshop: Mapped["Workshop"] = relationship(back_populates="vats")
     lots: Mapped[list["DipLot"]] = relationship(back_populates="vat")
+    ferment_logs: Mapped[list["FermentLog"]] = relationship(back_populates="vat")
 
     def latest_lot(self) -> Optional["DipLot"]:
         if not self.lots:
@@ -72,3 +73,22 @@ class DipLot(Base):
     redoxMv: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 2), nullable=True)
 
     vat: Mapped["Vat"] = relationship(back_populates="lots")
+
+
+class FermentLog(Base):
+    """靛蓝发酵温志：还原中按缸登记的连续采样读数。"""
+
+    __tablename__ = "ferment_logs"
+    __table_args__ = (
+        UniqueConstraint("vat_id", "seq", name="uniq_ferment_seq_per_vat"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vat_id: Mapped[int] = mapped_column(ForeignKey("vats.id", ondelete="CASCADE"))
+    seq: Mapped[int] = mapped_column()  # 同缸志序号唯一
+    tempC: Mapped[Decimal] = mapped_column(Numeric(5, 2))  # 液温摄氏，允许 20~42
+    ph: Mapped[Decimal] = mapped_column(Numeric(4, 2))  # 酸碱值，允许 8~12
+    sampledAt: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    inspector: Mapped[str] = mapped_column(String(80))
+
+    vat: Mapped["Vat"] = relationship(back_populates="ferment_logs")

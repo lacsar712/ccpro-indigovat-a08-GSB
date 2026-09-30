@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.models import DipLot, User, Vat, Workshop
+from app.models import DipLot, FermentLog, User, Vat, Workshop
 
 _PWD_SALT = os.environ.get("PWD_SALT", "indigovat-dev-salt").encode("utf-8")
 
@@ -137,6 +137,33 @@ def ensure_seed_data(db: Session) -> None:
                 (32, "28.00", "-470.00"),
                 (20, "33.00", "-505.00"),
                 (10, "38.50", "-530.00"),
+            ],
+        )
+    )
+
+    # 仅 V-01 播 3 条发酵温志（不足齐套四条，改可染色应被挡下）；
+    # 采样时刻均晚于其最近浸染（8 小时前），读数处于合法区间。
+    def ferment_logs(vat_id: int, series):
+        """series: (seq, hours_ago, tempC, ph, inspector)"""
+        return [
+            FermentLog(
+                vat_id=vat_id,
+                seq=seq,
+                sampledAt=now - timedelta(hours=hours),
+                tempC=Decimal(tempC),
+                ph=Decimal(ph),
+                inspector=inspector,
+            )
+            for seq, hours, tempC, ph, inspector in series
+        ]
+
+    db.add_all(
+        ferment_logs(
+            v1.id,
+            [
+                (1, 6, "30.00", "9.20", "吴莲"),
+                (2, 4, "31.50", "9.50", "吴莲"),
+                (3, 2, "32.00", "9.80", "龙秀英"),
             ],
         )
     )
